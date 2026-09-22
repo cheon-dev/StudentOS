@@ -1,0 +1,16 @@
+import { addDoc, collection, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp, updateDoc, type DocumentData, type FirestoreError } from 'firebase/firestore'
+import { db } from '../firebase/config.ts'
+import { projectCategories, projectPriorities, projectStatuses, type Project, type ProjectFormData } from '../types/project.ts'
+import { localDateTimeToTimestamp, timestampToDateInput } from '../utils/task.ts'
+
+function projectsCollection(userId: string) { return collection(db, 'users', userId, 'projects') }
+function projectDocument(userId: string, projectId: string) { return doc(db, 'users', userId, 'projects', projectId) }
+function timestamp(data: DocumentData, key: string) { return data[key] instanceof Timestamp ? data[key] as Timestamp : null }
+function string(data: DocumentData, key: string) { return typeof data[key] === 'string' ? data[key] : '' }
+function valid<T extends readonly string[]>(values: T, value: unknown, fallback: T[number]) { return typeof value === 'string' && values.includes(value) ? value as T[number] : fallback }
+function mapProject(id: string, data: DocumentData): Project { const start = timestamp(data, 'startDate'); const due = timestamp(data, 'dueDate'); return { id, name: string(data, 'name'), description: string(data, 'description'), category: valid(projectCategories, data.category, 'Other'), status: valid(projectStatuses, data.status, 'Planning'), priority: valid(projectPriorities, data.priority, 'Medium'), startDate: timestampToDateInput(start), dueDate: timestampToDateInput(due), startDateTimestamp: start, dueDateTimestamp: due, progress: typeof data.progress === 'number' ? Math.max(0, Math.min(100, data.progress)) : 0, subjectId: typeof data.subjectId === 'string' ? data.subjectId : null, createdAt: timestamp(data, 'createdAt'), updatedAt: timestamp(data, 'updatedAt'), completedAt: timestamp(data, 'completedAt') } }
+function payload(project: ProjectFormData) { return { name: project.name.trim(), description: project.description.trim(), category: project.category, status: project.status, priority: project.priority, startDate: localDateTimeToTimestamp(project.startDate, ''), dueDate: localDateTimeToTimestamp(project.dueDate, ''), progress: project.progress, subjectId: project.subjectId || null } }
+export function subscribeToProjects(userId: string, onProjects: (projects: Project[]) => void, onError: (error: FirestoreError) => void) { return onSnapshot(projectsCollection(userId), (snapshot) => onProjects(snapshot.docs.map((item) => mapProject(item.id, item.data()))), onError) }
+export async function createProject(userId: string, project: ProjectFormData) { return addDoc(projectsCollection(userId), { ...payload(project), createdAt: serverTimestamp(), updatedAt: serverTimestamp(), completedAt: project.status === 'Completed' ? serverTimestamp() : null }) }
+export async function updateProject(userId: string, projectId: string, project: ProjectFormData) { await updateDoc(projectDocument(userId, projectId), { ...payload(project), updatedAt: serverTimestamp(), completedAt: project.status === 'Completed' ? serverTimestamp() : null }) }
+export async function deleteProject(userId: string, projectId: string) { await deleteDoc(projectDocument(userId, projectId)) }
