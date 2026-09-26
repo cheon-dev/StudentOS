@@ -6,6 +6,15 @@ export type SubjectColor = (typeof subjectColors)[number]
 export const subjectIcons = ['book', 'code', 'flask', 'calculator', 'globe', 'palette'] as const
 export type SubjectIcon = (typeof subjectIcons)[number]
 
+export const subjectIconLabels: Record<SubjectIcon, string> = {
+  book: 'Book',
+  code: 'Code',
+  flask: 'Science',
+  calculator: 'Calculator',
+  globe: 'Globe',
+  palette: 'Design',
+}
+
 export const subjectDays = [
   'Monday',
   'Tuesday',
@@ -32,6 +41,8 @@ export type SubjectFormData = {
   icon: SubjectIcon
   semester: string
   schoolYear: string
+  startDate: string
+  endDate: string
   schedule: SubjectSchedule[]
 }
 
@@ -63,6 +74,8 @@ export function emptySubjectForm(): SubjectFormData {
     icon: 'book',
     semester: '',
     schoolYear: '',
+    startDate: '',
+    endDate: '',
     schedule: [],
   }
 }

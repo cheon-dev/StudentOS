@@ -18,7 +18,7 @@ type SubjectIconProps = {
 }
 
 export function SubjectIcon({ icon, color, size = 21 }: SubjectIconProps) {
-  const Icon = subjectIconMap[icon]
+  const Icon = subjectIconMap[icon] ?? BookOpen
 
   return (
     <span className={`subject-symbol subject-symbol--${color}`}>

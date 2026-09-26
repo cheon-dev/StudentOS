@@ -9,6 +9,7 @@ import { auth } from '../firebase/config.ts'
 import { deleteUserFirestoreData } from '../services/accountService.ts'
 import { clearUserFiles } from '../services/fileService.ts'
 import { getNotificationPreferences, saveNotificationPreferences } from '../services/notificationService.ts'
+import { getNotificationAccess, requestNotificationAccess, type NotificationAccessState } from '../services/nativeNotificationService.ts'
 import { removeProfileImage } from '../services/profileImageService.ts'
 import { autoLockDurations, type AutoLockDuration } from '../types/vault.ts'
 import type { NotificationPreferences } from '../types/notification.ts'
@@ -25,6 +26,8 @@ export function Settings() {
   const navigate = useNavigate()
   const passwordUser = Boolean(user?.providerData.some((provider) => provider.providerId === 'password'))
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences | null>(null)
+  const [notificationAccess, setNotificationAccess] = useState<NotificationAccessState>('unsupported')
+  const [requestingNotificationAccess, setRequestingNotificationAccess] = useState(false)
   const [notificationError, setNotificationError] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -46,6 +49,7 @@ export function Settings() {
   useEffect(() => {
     if (!user) return
     void getNotificationPreferences(user.uid).then(setNotificationPreferences).catch(() => setNotificationError('Notification preferences could not be loaded.'))
+    void getNotificationAccess().then(setNotificationAccess).catch(() => setNotificationAccess('denied'))
   }, [user])
 
   useEffect(() => {
@@ -109,6 +113,17 @@ export function Settings() {
     }
   }
 
+  async function enablePhoneNotifications() {
+    setRequestingNotificationAccess(true)
+    try {
+      setNotificationAccess(await requestNotificationAccess())
+    } catch (reason) {
+      setNotificationError(getFirebaseErrorMessage(reason, 'Phone notifications could not be enabled.'))
+    } finally {
+      setRequestingNotificationAccess(false)
+    }
+  }
+
   async function resetVault() {
     if (resetConfirmation !== 'RESET VAULT') return
     try {
@@ -161,6 +176,7 @@ export function Settings() {
     <section className="settings-card">
       <div className="settings-card-heading"><span className="settings-card-icon"><Bell size={19} /></span><div><h2>Notifications</h2><p>Choose which workspace reminders StudentOS creates for you.</p></div></div>
       {notificationError && <div className="profile-notice profile-notice--error" role="alert">{notificationError}</div>}
+      <div className="settings-row notification-access-row"><div><strong>Phone notifications</strong><small>{notificationAccess === 'granted' ? 'StudentOS can alert you about upcoming deadlines.' : notificationAccess === 'unsupported' ? 'Install the Android app to enable phone notifications.' : notificationAccess === 'denied' ? 'Notifications are blocked. Allow them in Android system settings.' : 'Allow StudentOS to notify you about upcoming deadlines.'}</small></div>{notificationAccess === 'granted' ? <span className="notification-access-status">Enabled</span> : notificationAccess === 'unsupported' ? <span className="notification-access-status">Android only</span> : <button className="secondary-button" type="button" onClick={() => void enablePhoneNotifications()} disabled={requestingNotificationAccess}>{requestingNotificationAccess ? 'Requesting...' : 'Allow notifications'}</button>}</div>
       {notificationPreferences && <div className="settings-preference-list">{([['taskReminders', 'Task reminders', 'Upcoming and due task notifications.'], ['overdueAlerts', 'Overdue alerts', 'Alerts for incomplete tasks past their due date.'], ['calendarReminders', 'Calendar reminders', 'Reminders for events starting soon.'], ['projectReminders', 'Project reminders', 'Alerts for projects approaching their deadline.']] as const).map(([key, title, description]) => <label className="settings-preference-row" key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={notificationPreferences[key]} onChange={(event) => void updateNotificationPreference(key, event.target.checked)} /></label>)}</div>}
     </section>
 

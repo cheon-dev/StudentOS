@@ -20,8 +20,10 @@ type CalendarItem = { id: string; title: string; source: CalendarSource; start: 
 function scheduleItems(subjects: Subject[], from: Date, to: Date): CalendarItem[] {
   const entries: CalendarItem[] = []
   for (let date = new Date(from); date <= to; date = addDays(date, 1)) {
-    subjects.forEach((subject) => subject.schedule.forEach((schedule) => {
-      if (dayNameToIndex(schedule.day) !== date.getDay()) return
+      subjects.forEach((subject) => subject.schedule.forEach((schedule) => {
+       const currentDateKey = dateKey(date)
+       if ((subject.startDate && currentDateKey < subject.startDate) || (subject.endDate && currentDateKey > subject.endDate)) return
+       if (dayNameToIndex(schedule.day) !== date.getDay()) return
       const startTimestamp = timestampForDateTime(date, schedule.startTime)
       const endTimestamp = timestampForDateTime(date, schedule.endTime)
       if (startTimestamp) entries.push({ id: `class-${subject.id}-${dateKey(date)}-${schedule.startTime}`, title: subject.name, source: 'class', start: startTimestamp.toDate(), end: endTimestamp?.toDate() ?? null, allDay: false, sourceId: subject.id, subjectId: subject.id, type: 'Class', location: subject.room })

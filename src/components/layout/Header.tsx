@@ -19,7 +19,8 @@ import { useTheme } from '../../context/useTheme.ts'
 import { auth } from '../../firebase/config.ts'
 import { subscribeToEvents } from '../../services/calendarService.ts'
 import { subscribeToProjects } from '../../services/projectService.ts'
-import { ensureSmartNotifications, getNotificationPreferences, markAllNotificationsRead, markNotificationRead, subscribeToNotifications } from '../../services/notificationService.ts'
+import { ensureSmartNotifications, getNotificationPreferences, markAllNotificationsRead, markNotificationRead, onNotificationPreferencesChanged, subscribeToNotifications } from '../../services/notificationService.ts'
+import { onNotificationAccessChanged, syncNativeNotifications } from '../../services/nativeNotificationService.ts'
 import { subscribeToTasks } from '../../services/taskService.ts'
 import type { CalendarEvent } from '../../types/calendar.ts'
 import type { Notification, NotificationPreferences } from '../../types/notification.ts'
@@ -43,6 +44,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [notificationTasks, setNotificationTasks] = useState<Task[]>([])
   const [notificationEvents, setNotificationEvents] = useState<CalendarEvent[]>([])
   const [notificationProjects, setNotificationProjects] = useState<Project[]>([])
+  const [nativeNotificationVersion, setNativeNotificationVersion] = useState(0)
   const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const notificationMenuRef = useRef<HTMLDivElement | null>(null)
   const initials = getUserInitials(profile?.displayName || user?.displayName, user?.email)
@@ -82,10 +84,17 @@ export function Header({ onMenuClick }: HeaderProps) {
     return () => { active = false; unsubscribe(); tasksUnsubscribe(); eventsUnsubscribe(); projectsUnsubscribe() }
   }, [user?.uid])
 
+  useEffect(() => onNotificationAccessChanged(() => setNativeNotificationVersion((version) => version + 1)), [])
+
+  useEffect(() => onNotificationPreferencesChanged(() => {
+    if (user?.uid) void getNotificationPreferences(user.uid).then(setNotificationPreferences).catch(() => undefined)
+  }), [user?.uid])
+
   useEffect(() => {
     if (!user?.uid || !notificationPreferences) return
     void ensureSmartNotifications(user.uid, notificationTasks, notificationEvents, notificationProjects, notificationPreferences).catch(() => undefined)
-  }, [notificationEvents, notificationPreferences, notificationProjects, notificationTasks, user?.uid])
+    void syncNativeNotifications(notificationTasks, notificationEvents, notificationProjects, notificationPreferences).catch(() => undefined)
+  }, [nativeNotificationVersion, notificationEvents, notificationPreferences, notificationProjects, notificationTasks, user?.uid])
 
   async function handleLogout() {
     await signOut(auth)

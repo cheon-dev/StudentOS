@@ -8,6 +8,7 @@ import { defaultNotificationPreferences, notificationTypes, type Notification, t
 const notificationCollection = (uid: string) => collection(db, 'users', uid, 'notifications')
 const notificationDocument = (uid: string, id: string) => doc(db, 'users', uid, 'notifications', id)
 const preferencesDocument = (uid: string) => doc(db, 'users', uid, 'settings', 'notifications')
+const preferencesChangedEvent = 'studentos-notification-preferences-changed'
 const timestamp = (data: DocumentData, key: string) => data[key] instanceof Timestamp ? data[key] as Timestamp : null
 
 function mapNotification(id: string, data: DocumentData): Notification { return { id, type: notificationTypes.includes(data.type) ? data.type : 'system', title: typeof data.title === 'string' ? data.title : 'StudentOS notification', message: typeof data.message === 'string' ? data.message : '', relatedType: data.relatedType === 'task' || data.relatedType === 'event' || data.relatedType === 'project' || data.relatedType === 'reviewer' ? data.relatedType : null, relatedId: typeof data.relatedId === 'string' ? data.relatedId : null, read: data.read === true, createdAt: timestamp(data, 'createdAt') } }
@@ -17,7 +18,8 @@ export async function markNotificationRead(uid: string, id: string, read = true)
 export async function deleteNotification(uid: string, id: string) { return deleteDoc(notificationDocument(uid, id)) }
 export async function markAllNotificationsRead(uid: string) { const snapshot = await getDocs(notificationCollection(uid)); const batch = writeBatch(db); snapshot.docs.filter((entry) => entry.data().read !== true).forEach((entry) => batch.update(entry.ref, { read: true })); return batch.commit() }
 export async function getNotificationPreferences(uid: string): Promise<NotificationPreferences> { const snapshot = await getDoc(preferencesDocument(uid)); const data = snapshot.data(); return { taskReminders: data?.taskReminders !== false, overdueAlerts: data?.overdueAlerts !== false, calendarReminders: data?.calendarReminders !== false, projectReminders: data?.projectReminders !== false } }
-export async function saveNotificationPreferences(uid: string, preferences: NotificationPreferences) { return setDoc(preferencesDocument(uid), { ...preferences, updatedAt: serverTimestamp() }, { merge: true }) }
+export async function saveNotificationPreferences(uid: string, preferences: NotificationPreferences) { await setDoc(preferencesDocument(uid), { ...preferences, updatedAt: serverTimestamp() }, { merge: true }); if (typeof window !== 'undefined') window.dispatchEvent(new Event(preferencesChangedEvent)) }
+export function onNotificationPreferencesChanged(listener: () => void) { window.addEventListener(preferencesChangedEvent, listener); return () => window.removeEventListener(preferencesChangedEvent, listener) }
 
 function dateKey(date: Date) { return date.toISOString().slice(0, 10) }
 function startOfDay(date = new Date()) { const value = new Date(date); value.setHours(0, 0, 0, 0); return value }

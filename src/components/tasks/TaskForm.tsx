@@ -160,7 +160,7 @@ export function TaskForm({ task, subjects, projects = [], projectId, saving, onC
             <label className="reminder-toggle-row">
               <input type="checkbox" checked={formData.reminderEnabled} onChange={(event) => updateField('reminderEnabled', event.target.checked)} disabled={saving} />
               <span className="custom-checkbox" aria-hidden="true" />
-              <span><strong>Set a reminder</strong><small>Stored for future notification support.</small></span>
+              <span><strong>Set a reminder</strong><small>Send a phone notification before the deadline.</small></span>
             </label>
             {formData.reminderEnabled && (
               <div className="task-form-grid reminder-fields">

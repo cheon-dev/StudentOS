@@ -71,6 +71,8 @@ function mapSubject(id: string, data: DocumentData): Subject {
     icon: isSubjectIcon(data.icon) ? data.icon : 'book',
     semester: readString(data, 'semester'),
     schoolYear: readString(data, 'schoolYear'),
+    startDate: readString(data, 'startDate'),
+    endDate: readString(data, 'endDate'),
     schedule: readSchedule(data.schedule),
     createdAt: readTimestamp(data.createdAt),
     updatedAt: readTimestamp(data.updatedAt),
@@ -87,6 +89,8 @@ function subjectPayload(subject: SubjectFormData) {
     icon: subject.icon,
     semester: subject.semester.trim(),
     schoolYear: subject.schoolYear.trim(),
+    startDate: subject.startDate || '',
+    endDate: subject.endDate || '',
     schedule: subject.schedule,
   }
 }

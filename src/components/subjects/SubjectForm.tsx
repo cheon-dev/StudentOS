@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Plus, X } from 'lucide-react'
-import type { Subject, SubjectFormData, SubjectIcon as SubjectIconName } from '../../types/subject.ts'
-import { emptySubjectForm, subjectColors, subjectDays, subjectIcons } from '../../types/subject.ts'
+import type { Subject, SubjectFormData } from '../../types/subject.ts'
+import { emptySubjectForm, isSubjectColor, isSubjectIcon, subjectColors, subjectDays, subjectIconLabels, subjectIcons } from '../../types/subject.ts'
 import { SubjectIcon } from './SubjectIcon.tsx'
 
 type SubjectFormProps = {
@@ -21,10 +21,12 @@ function getFormData(subject?: Subject | null): SubjectFormData {
     code: subject.code,
     instructor: subject.instructor,
     room: subject.room,
-    color: subject.color,
-    icon: subject.icon,
+    color: isSubjectColor(subject.color) ? subject.color : 'purple',
+    icon: isSubjectIcon(subject.icon) ? subject.icon : 'book',
     semester: subject.semester,
     schoolYear: subject.schoolYear,
+    startDate: subject.startDate || '',
+    endDate: subject.endDate || '',
     schedule: subject.schedule.map((entry) => ({ ...entry })),
   }
 }
@@ -86,6 +88,16 @@ export function SubjectForm({ subject, saving, onClose, onSubmit }: SubjectFormP
 
     if (!formData.name.trim() || !formData.code.trim() || !formData.semester.trim() || !formData.schoolYear.trim()) {
       setValidationError('Complete the required fields before saving.')
+      return
+    }
+
+    if ((formData.startDate && !formData.endDate) || (!formData.startDate && formData.endDate)) {
+      setValidationError('Choose both a semester start date and end date.')
+      return
+    }
+
+    if (formData.startDate && formData.endDate && formData.endDate < formData.startDate) {
+      setValidationError('The semester end date must be on or after the start date.')
       return
     }
 
@@ -154,6 +166,14 @@ export function SubjectForm({ subject, saving, onClose, onSubmit }: SubjectFormP
               School year <span>*</span>
               <input type="text" value={formData.schoolYear} placeholder="2026-2027" onChange={(event) => updateField('schoolYear', event.target.value)} disabled={saving} required />
             </label>
+            <label>
+              Semester starts
+              <input type="date" value={formData.startDate} max={formData.endDate || undefined} onChange={(event) => updateField('startDate', event.target.value)} disabled={saving} />
+            </label>
+            <label>
+              Semester ends
+              <input type="date" value={formData.endDate} min={formData.startDate || undefined} onChange={(event) => updateField('endDate', event.target.value)} disabled={saving} />
+            </label>
           </div>
 
           <fieldset className="subject-choice-fieldset">
@@ -169,7 +189,7 @@ export function SubjectForm({ subject, saving, onClose, onSubmit }: SubjectFormP
             <legend>Icon</legend>
             <div className="subject-icon-choice-row">
               {subjectIcons.map((icon) => (
-                <button className={`icon-choice${formData.icon === icon ? ' icon-choice--selected' : ''}`} type="button" key={icon} aria-label={`Choose ${icon} icon`} aria-pressed={formData.icon === icon} onClick={() => setFormData((current) => ({ ...current, icon: icon as SubjectIconName }))} disabled={saving}>
+                <button className={`icon-choice${formData.icon === icon ? ' icon-choice--selected' : ''}`} type="button" key={icon} aria-label={`Choose ${subjectIconLabels[icon]} icon`} title={subjectIconLabels[icon]} aria-pressed={formData.icon === icon} onClick={() => setFormData((current) => ({ ...current, icon }))} disabled={saving}>
                   <SubjectIcon icon={icon} color={formData.color} size={18} />
                 </button>
               ))}

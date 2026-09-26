@@ -134,6 +134,7 @@ export function SubjectDetails() {
         <div><span>Room</span><strong>{subject.room || 'Not set'}</strong></div>
         <div><span>Semester</span><strong>{subject.semester}</strong></div>
         <div><span>School year</span><strong>{subject.schoolYear}</strong></div>
+        <div><span>Semester dates</span><strong>{subject.startDate && subject.endDate ? `${subject.startDate} to ${subject.endDate}` : 'Not set'}</strong></div>
       </section>
 
       <section className="subject-details-content">
