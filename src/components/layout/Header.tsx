@@ -4,7 +4,6 @@ import {
   Bell,
   ChevronDown,
   LogOut,
-  Menu,
   Monitor,
   Moon,
   Search,
@@ -28,11 +27,7 @@ import type { Project } from '../../types/project.ts'
 import type { Task } from '../../types/task.ts'
 import { getUserInitials } from '../../utils/user.ts'
 
-type HeaderProps = {
-  onMenuClick: () => void
-}
-
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header() {
   const { user, profile, avatarUrl } = useAuth()
   const { preference, setPreference } = useTheme()
   const location = useLocation()
@@ -107,9 +102,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="app-header">
       <div className="header-leading">
-        <button className="header-menu-button" type="button" aria-label="Open navigation" onClick={onMenuClick}>
-          <Menu size={21} strokeWidth={1.8} />
-        </button>
         <div>
           <p className="header-kicker">StudentOS workspace</p>
           <h1 className="header-title">{getPageTitle(location.pathname)}</h1>

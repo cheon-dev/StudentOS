@@ -13,15 +13,127 @@ import type { Subject } from '../types/subject.ts'
 import { getFirebaseErrorMessage } from '../utils/firebaseError.ts'
 
 export function Notes() {
-  const { user } = useAuth(); const userId = user?.uid; const [params] = useSearchParams(); const [notes, setNotes] = useState<Note[]>([]); const [subjects, setSubjects] = useState<Subject[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [search, setSearch] = useState(''); const [subjectId, setSubjectId] = useState(params.get('subjectId') || 'all'); const [tag, setTag] = useState('all'); const [sort, setSort] = useState('updated'); const [formOpen, setFormOpen] = useState(() => params.get('new') === 'true'); const [editing, setEditing] = useState<Note | null>(null); const [deleteTarget, setDeleteTarget] = useState<Note | null>(null); const [saving, setSaving] = useState(false); const [deleting, setDeleting] = useState(false); const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
-  useEffect(() => { if (!userId) return; return subscribeToNotes(userId, (next) => { setNotes(next); setLoading(false) }, (e) => { setError(getFirebaseErrorMessage(e, 'We could not load your notes.')); setLoading(false) }) }, [userId])
-  useEffect(() => { if (!userId) return; return subscribeToSubjects(userId, setSubjects, () => setSubjects([])) }, [userId])
-  const subjectMap = new Map(subjects.map((subject) => [subject.id, subject])); const tags = [...new Set(notes.flatMap((note) => note.tags))].sort(); const q = search.toLowerCase().trim(); const visible = notes.filter((note) => (!q || `${note.title} ${note.content} ${note.tags.join(' ')}`.toLowerCase().includes(q)) && (subjectId === 'all' || subjectId === 'general' ? (subjectId === 'general' ? note.subjectId === null : true) : note.subjectId === subjectId) && (tag === 'all' || note.tags.includes(tag))).sort((a, b) => sort === 'title' ? a.title.localeCompare(b.title) : (Number(b.isPinned) - Number(a.isPinned)) || ((b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0)))
-  function openCreate() { setEditing(null); setFormOpen(true) }
-  async function save(data: NoteFormData) { if (!userId) return; setSaving(true); try { if (editing) await updateNote(userId, editing.id, data); else await createNote(userId, { ...data, subjectId: data.subjectId || params.get('subjectId') || null }); setFormOpen(false); setEditing(null); setToast({ message: editing ? 'Note updated.' : 'Note added.', tone: 'success' }) } catch (e) { setToast({ message: getFirebaseErrorMessage(e, 'We could not save this note.'), tone: 'error' }) } finally { setSaving(false) } }
-  async function remove() { if (!userId || !deleteTarget) return; setDeleting(true); try { await deleteNote(userId, deleteTarget.id); setDeleteTarget(null); setToast({ message: 'Note deleted.', tone: 'success' }) } catch (e) { setToast({ message: getFirebaseErrorMessage(e, 'We could not delete this note.'), tone: 'error' }) } finally { setDeleting(false) } }
-  async function togglePin(note: Note) { if (!userId) return; try { await updateNote(userId, note.id, { title: note.title, content: note.content, subjectId: note.subjectId, tags: note.tags, isPinned: !note.isPinned }) } catch (e) { setToast({ message: getFirebaseErrorMessage(e, 'We could not update this note.'), tone: 'error' }) } }
-  function clear() { setSearch(''); setSubjectId('all'); setTag('all'); setSort('updated') }
-  const filtered = Boolean(q || subjectId !== 'all' || tag !== 'all' || sort !== 'updated')
-  return <div className="notes-page"><section className="module-page-header"><div><p className="dashboard-eyebrow">A place for the useful details</p><h1>Notes</h1><p>Keep ideas, references, and class notes close by.</p></div><button className="primary-button" type="button" onClick={openCreate}><Plus size={17} /> Add note</button></section><div className="notes-toolbar"><label className="subjects-search"><Search size={16} /><input type="search" value={search} placeholder="Search notes" aria-label="Search notes" onChange={(e) => setSearch(e.target.value)} /></label><select value={subjectId} aria-label="Filter by subject" onChange={(e) => setSubjectId(e.target.value)}><option value="all">All subjects</option><option value="general">General notes</option>{subjects.map((subject) => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</select><select value={tag} aria-label="Filter by tag" onChange={(e) => setTag(e.target.value)}><option value="all">All tags</option>{tags.map((item) => <option value={item} key={item}>#{item}</option>)}</select><select value={sort} aria-label="Sort notes" onChange={(e) => setSort(e.target.value)}><option value="updated">Recently updated</option><option value="title">Title</option></select>{filtered && <button className="clear-filters-button" type="button" onClick={clear}><RotateCcw size={14} /> Clear</button>}</div>{error ? <section className="subjects-feedback subjects-feedback--error"><FileText size={25} /><h2>Notes unavailable</h2><p>{error}</p></section> : loading ? <div className="subject-grid"><div className="subject-card subject-card--skeleton" /><div className="subject-card subject-card--skeleton" /><div className="subject-card subject-card--skeleton" /></div> : notes.length === 0 ? <section className="subjects-feedback"><div className="empty-subject-icon"><FileText size={27} /></div><h2>No notes yet</h2><p>Create your first note to keep ideas and references organized.</p><button className="primary-button" type="button" onClick={openCreate}><Plus size={17} /> Add note</button></section> : visible.length === 0 ? <section className="subjects-feedback"><h2>No notes match your filters</h2><p>Try another search or clear your filters.</p><button className="secondary-button" type="button" onClick={clear}>Clear filters</button></section> : <div className="note-grid">{visible.map((note) => <NoteCard key={note.id} note={note} subject={note.subjectId ? subjectMap.get(note.subjectId) : undefined} onEdit={(item) => { setEditing(item); setFormOpen(true) }} onDelete={setDeleteTarget} onTogglePin={togglePin} />)}</div>}{formOpen && <NoteForm key={editing?.id ?? 'new-note'} note={editing} subjects={subjects} saving={saving} onClose={() => setFormOpen(false)} onSubmit={save} />}{deleteTarget && <DeleteTaskDialog task={{ id: deleteTarget.id, title: deleteTarget.title, description: '', subjectId: null, projectId: null, type: 'Other', priority: 'Low', status: 'Pending', dueDate: null, estimatedMinutes: null, reminderEnabled: false, reminderAt: null, createdAt: null, updatedAt: null, completedAt: null }} deleting={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={remove} />}{toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />}</div>
+  const { user } = useAuth()
+  const userId = user?.uid
+  const [params] = useSearchParams()
+  const [notes, setNotes] = useState<Note[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [subjectId, setSubjectId] = useState(params.get('subjectId') || 'all')
+  const [tag, setTag] = useState('all')
+  const [sort, setSort] = useState('updated')
+  const [formOpen, setFormOpen] = useState(() => params.get('new') === 'true')
+  const [editing, setEditing] = useState<Note | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    if (!userId) return
+    return subscribeToNotes(userId, (nextNotes) => {
+      setNotes(nextNotes)
+      setLoading(false)
+    }, (reason) => {
+      setError(getFirebaseErrorMessage(reason, 'We could not load your notes.'))
+      setLoading(false)
+    })
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    return subscribeToSubjects(userId, setSubjects, () => setSubjects([]))
+  }, [userId])
+
+  const subjectMap = new Map(subjects.map((subject) => [subject.id, subject]))
+  const tags = [...new Set(notes.flatMap((note) => note.tags))].sort()
+  const query = search.toLowerCase().trim()
+  const visible = notes
+    .filter((note) => (
+      (!query || `${note.title} ${note.content} ${note.tags.join(' ')}`.toLowerCase().includes(query))
+      && (subjectId === 'all' || (subjectId === 'general' ? note.subjectId === null : note.subjectId === subjectId))
+      && (tag === 'all' || note.tags.includes(tag))
+    ))
+    .sort((first, second) => sort === 'title'
+      ? first.title.localeCompare(second.title)
+      : (Number(second.isPinned) - Number(first.isPinned)) || ((second.updatedAt?.toMillis() ?? 0) - (first.updatedAt?.toMillis() ?? 0)))
+
+  function openCreate() {
+    setEditing(null)
+    setFormOpen(true)
+  }
+
+  async function save(data: NoteFormData) {
+    if (!userId) return
+    setSaving(true)
+    try {
+      if (editing) await updateNote(userId, editing.id, data)
+      else await createNote(userId, { ...data, subjectId: data.subjectId || params.get('subjectId') || null })
+      setFormOpen(false)
+      setEditing(null)
+      setToast({ message: editing ? 'Note updated.' : 'Note added.', tone: 'success' })
+    } catch (reason) {
+      setToast({ message: getFirebaseErrorMessage(reason, 'We could not save this note.'), tone: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove() {
+    if (!userId || !deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteNote(userId, deleteTarget.id)
+      setDeleteTarget(null)
+      setToast({ message: 'Note deleted.', tone: 'success' })
+    } catch (reason) {
+      setToast({ message: getFirebaseErrorMessage(reason, 'We could not delete this note.'), tone: 'error' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function togglePin(note: Note) {
+    if (!userId) return
+    try {
+      await updateNote(userId, note.id, { title: note.title, content: note.content, subjectId: note.subjectId, tags: note.tags, isPinned: !note.isPinned })
+    } catch (reason) {
+      setToast({ message: getFirebaseErrorMessage(reason, 'We could not update this note.'), tone: 'error' })
+    }
+  }
+
+  function clear() {
+    setSearch('')
+    setSubjectId('all')
+    setTag('all')
+    setSort('updated')
+  }
+
+  const filtered = Boolean(query || subjectId !== 'all' || tag !== 'all' || sort !== 'updated')
+
+  return (
+    <div className="notes-page">
+      <section className="module-page-header">
+        <div><p className="dashboard-eyebrow">A place for the useful details</p><h1>Notes</h1><p>Keep ideas, references, and class notes close by.</p></div>
+        <button className="primary-button" type="button" onClick={openCreate}><Plus size={17} /> Add note</button>
+      </section>
+      <div className="notes-toolbar">
+        <label className="subjects-search"><Search size={16} /><input type="search" value={search} placeholder="Search notes" aria-label="Search notes" onChange={(event) => setSearch(event.target.value)} /></label>
+        <select value={subjectId} aria-label="Filter by subject" onChange={(event) => setSubjectId(event.target.value)}><option value="all">All subjects</option><option value="general">General notes</option>{subjects.map((subject) => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</select>
+        <select value={tag} aria-label="Filter by tag" onChange={(event) => setTag(event.target.value)}><option value="all">All tags</option>{tags.map((item) => <option value={item} key={item}>#{item}</option>)}</select>
+        <select value={sort} aria-label="Sort notes" onChange={(event) => setSort(event.target.value)}><option value="updated">Recently updated</option><option value="title">Title</option></select>
+        {filtered && <button className="clear-filters-button" type="button" onClick={clear}><RotateCcw size={14} /> Clear</button>}
+      </div>
+      {error ? <section className="subjects-feedback subjects-feedback--error"><FileText size={25} /><h2>Notes unavailable</h2><p>{error}</p></section>
+        : loading ? <div className="subject-grid"><div className="subject-card subject-card--skeleton" /><div className="subject-card subject-card--skeleton" /><div className="subject-card subject-card--skeleton" /></div>
+          : notes.length === 0 ? <section className="subjects-feedback"><div className="empty-subject-icon"><FileText size={27} /></div><h2>No notes yet</h2><p>Create your first note to keep ideas and references organized.</p><button className="primary-button" type="button" onClick={openCreate}><Plus size={17} /> Add note</button></section>
+            : visible.length === 0 ? <section className="subjects-feedback"><h2>No notes match your filters</h2><p>Try another search or clear the filters.</p><button className="secondary-button" type="button" onClick={clear}>Clear filters</button></section>
+              : <div className="notes-grid">{visible.map((note) => <NoteCard key={note.id} note={note} subject={note.subjectId ? subjectMap.get(note.subjectId) : undefined} onEdit={(item) => { setEditing(item); setFormOpen(true) }} onDelete={setDeleteTarget} onTogglePin={togglePin} />)}</div>}
+      {formOpen && <NoteForm key={editing?.id ?? 'new-note'} note={editing} initialSubjectId={params.get('subjectId')} subjects={subjects} saving={saving} onClose={() => setFormOpen(false)} onSubmit={save} />}
+      {deleteTarget && <DeleteTaskDialog task={{ id: deleteTarget.id, title: deleteTarget.title, description: '', subjectId: null, projectId: null, type: 'Other', priority: 'Low', status: 'Pending', dueDate: null, estimatedMinutes: null, reminderEnabled: false, reminderAt: null, createdAt: null, updatedAt: null, completedAt: null }} itemLabel="note" deleting={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={remove} />}
+      {toast && <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} />}
+    </div>
+  )
 }

@@ -10,6 +10,7 @@ import {
 } from 'firebase/auth'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/AuthLayout.tsx'
+import { PasswordField } from '../components/PasswordField.tsx'
 import { auth, authPersistenceReady } from '../firebase/config.ts'
 import { syncUserDocument } from '../firebase/users.ts'
 import { getFirebaseErrorMessage } from '../utils/firebaseError.ts'
@@ -140,9 +141,8 @@ export function Login() {
               Forgot password?
             </button>
           </span>
-          <input
+          <PasswordField
             id="loginPassword"
-            type="password"
             autoComplete="current-password"
             placeholder="Enter your password"
             value={password}

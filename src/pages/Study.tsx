@@ -5,6 +5,7 @@ import { useAuth } from '../context/useAuth.ts'
 import { subscribeToSubjects } from '../services/subjectService.ts'
 import { subscribeToTasks } from '../services/taskService.ts'
 import { createStudySession, subscribeToStudySessions } from '../services/studyService.ts'
+import { getNotificationAccess, requestNotificationAccess, syncStudyTimerNotification } from '../services/nativeNotificationService.ts'
 import type { Subject } from '../types/subject.ts'
 import type { Task } from '../types/task.ts'
 import type { StudySession } from '../types/studySession.ts'
@@ -22,6 +23,18 @@ function isThisWeek(date: Date) { const now = new Date(); const start = new Date
 export function Study() {
   const { user } = useAuth(); const userId = user?.uid; const finishingRef = useRef(false); const [active, setActive] = useState<ActiveTimer | null>(() => userId ? readTimer(userId) : null); const [preset, setPreset] = useState<TimerPreset>('Pomodoro'); const [customMinutes, setCustomMinutes] = useState(30); const [subjectId, setSubjectId] = useState(''); const [taskId, setTaskId] = useState(''); const [subjects, setSubjects] = useState<Subject[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [sessions, setSessions] = useState<StudySession[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [toast, setToast] = useState('')
   useEffect(() => { if (!userId) return; if (active) window.localStorage.setItem(timerStorageKey(userId), JSON.stringify(active)); else window.localStorage.removeItem(timerStorageKey(userId)) }, [active, userId]); useEffect(() => { if (!userId) return; const a = subscribeToSubjects(userId, setSubjects, () => setSubjects([])); const b = subscribeToTasks(userId, setTasks, () => setTasks([])); const c = subscribeToStudySessions(userId, (next) => { setSessions(next); setLoading(false) }, (e) => { setError(getFirebaseErrorMessage(e, 'Study history could not be loaded.')); setLoading(false) }); return () => { a(); b(); c() } }, [userId])
+  useEffect(() => {
+    async function syncTimerNotification() {
+      if (!active?.running || !active.endAt) {
+        await syncStudyTimerNotification(null)
+        return
+      }
+      let access = await getNotificationAccess()
+      if (access === 'prompt' || access === 'prompt-with-rationale') access = await requestNotificationAccess()
+      if (access === 'granted') await syncStudyTimerNotification({ endAt: active.endAt, preset: active.preset })
+    }
+    void syncTimerNotification().catch(() => undefined)
+  }, [active?.endAt, active?.preset, active?.running])
   const plannedMinutes = preset === 'Pomodoro' ? 25 : preset === 'Long Focus' ? 50 : customMinutes; const remaining = active?.remainingSeconds ?? plannedMinutes * 60; const todayMinutes = sessions.filter((session) => session.completed && isToday(session.startedAt.toDate())).reduce((sum, session) => sum + session.actualMinutes, 0); const weekSessions = sessions.filter((session) => isThisWeek(session.startedAt.toDate())); const subjectMap = new Map(subjects.map((subject) => [subject.id, subject])); const taskMap = new Map(tasks.map((task) => [task.id, task]))
   const finishTimer = useCallback(async (completed: boolean, remainingSeconds: number) => { if (!active || !userId || finishingRef.current) return; finishingRef.current = true; const actualMinutes = Math.floor((active.plannedSeconds - remainingSeconds) / 60); if (actualMinutes >= 1 || completed) { try { await createStudySession(userId, { subjectId: active.subjectId, taskId: active.taskId, startedAt: Timestamp.fromMillis(active.startedAt || Date.now()), endedAt: Timestamp.now(), plannedMinutes: Math.round(active.plannedSeconds / 60), actualMinutes, sessionType: active.sessionType, completed }) } catch (e) { setError(getFirebaseErrorMessage(e, 'The study session could not be saved.')) } } setActive(null); finishingRef.current = false; if (completed) setToast('Study session complete. Nice work.') }, [active, userId])
   useEffect(() => { if (!active?.running || !active.endAt) return; const interval = window.setInterval(() => { const remaining = Math.max(0, Math.ceil((active.endAt as number - Date.now()) / 1000)); if (remaining <= 0) void finishTimer(true, 0); else setActive((current) => current ? { ...current, remainingSeconds: remaining } : current) }, 500); return () => window.clearInterval(interval) }, [active?.running, active?.endAt, finishTimer])

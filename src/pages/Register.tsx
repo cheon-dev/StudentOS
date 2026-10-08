@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/AuthLayout.tsx'
+import { PasswordField } from '../components/PasswordField.tsx'
 import { auth, authPersistenceReady } from '../firebase/config.ts'
 import { syncUserDocument } from '../firebase/users.ts'
 import { getFirebaseErrorMessage } from '../utils/firebaseError.ts'
@@ -106,9 +107,8 @@ export function Register() {
         <div className="form-grid">
           <label htmlFor="registerPassword">
             Password
-            <input
+            <PasswordField
               id="registerPassword"
-              type="password"
               autoComplete="new-password"
               placeholder="6+ characters"
               value={password}
@@ -120,9 +120,8 @@ export function Register() {
           </label>
           <label htmlFor="confirmPassword">
             Confirm password
-            <input
+            <PasswordField
               id="confirmPassword"
-              type="password"
               autoComplete="new-password"
               placeholder="Repeat password"
               value={confirmPassword}

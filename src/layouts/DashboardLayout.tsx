@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { BottomNavigation } from '../components/layout/BottomNavigation.tsx'
 import { Header } from '../components/layout/Header.tsx'
 import { OfflineBanner } from '../components/layout/OfflineBanner.tsx'
 import { Sidebar } from '../components/layout/Sidebar.tsx'
@@ -12,7 +13,6 @@ export function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.localStorage.getItem(sidebarStorageKey) === 'true',
   )
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   function toggleSidebar() {
     setSidebarCollapsed((collapsed) => {
@@ -22,50 +22,22 @@ export function DashboardLayout() {
     })
   }
 
-  useEffect(() => {
-    if (!mobileSidebarOpen) {
-      return
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setMobileSidebarOpen(false)
-      }
-    }
-
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [mobileSidebarOpen])
-
   return (
     <div className={`app-shell${sidebarCollapsed ? ' app-shell--collapsed' : ''}`}>
       <Sidebar
         collapsed={sidebarCollapsed}
-        mobileOpen={mobileSidebarOpen}
-        onClose={() => setMobileSidebarOpen(false)}
+        mobileOpen={false}
+        onClose={() => undefined}
         onToggleCollapse={toggleSidebar}
       />
-      {mobileSidebarOpen && (
-        <button
-          className="mobile-sidebar-overlay"
-          type="button"
-          aria-label="Close navigation"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
       <div className="app-main">
-        <Header key={user?.uid ?? 'signed-out'} onMenuClick={() => setMobileSidebarOpen(true)} />
+        <Header key={user?.uid ?? 'signed-out'} />
         <OfflineBanner />
         <main className="page-content">
           <Outlet />
         </main>
       </div>
+      <BottomNavigation />
     </div>
   )
 }

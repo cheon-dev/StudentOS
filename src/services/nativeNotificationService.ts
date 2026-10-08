@@ -8,6 +8,8 @@ import type { Task } from '../types/task.ts'
 const accessChangedEvent = 'studentos-notification-access-changed'
 const channelId = 'studentos-deadlines'
 const scheduledIdsKey = 'studentos-native-notification-ids'
+const studyTimerNotificationId = 1_987_654_321
+const studyTimerCompletionNotificationId = studyTimerNotificationId + 1
 
 export type NotificationAccessState = 'granted' | 'denied' | 'prompt' | 'prompt-with-rationale' | 'unsupported'
 
@@ -86,6 +88,50 @@ async function cancelPreviouslyScheduled() {
   writeScheduledIds([])
 }
 
+async function ensureNotificationChannel() {
+  await LocalNotifications.createChannel({
+    id: channelId,
+    name: 'StudentOS deadlines',
+    description: 'Deadlines and reminders from your StudentOS workspace.',
+    importance: 4,
+    visibility: 1,
+    vibration: true,
+  })
+}
+
+export async function syncStudyTimerNotification(timer: { endAt: number; preset: string } | null) {
+  if (!isNative()) return
+
+  await LocalNotifications.cancel({ notifications: [{ id: studyTimerNotificationId }, { id: studyTimerCompletionNotificationId }] })
+  if (!timer || timer.endAt <= Date.now() || (await getNotificationAccess()) !== 'granted') return
+
+  await ensureNotificationChannel()
+  const endTime = new Date(timer.endAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  await LocalNotifications.schedule({ notifications: [
+    {
+      id: studyTimerNotificationId,
+      title: 'Study timer running',
+      body: `${timer.preset} session ends at ${endTime}.`,
+      channelId,
+      ongoing: true,
+      autoCancel: false,
+      isExactNotification: false,
+      extra: { relatedId: 'study-timer' },
+      schedule: { at: new Date(Date.now() + 100) },
+    },
+    {
+      id: studyTimerCompletionNotificationId,
+      title: 'Study timer complete',
+      body: `${timer.preset} session finished. Nice work!`,
+      channelId,
+      autoCancel: true,
+      isExactNotification: false,
+      extra: { relatedId: 'study-timer' },
+      schedule: { at: new Date(timer.endAt), allowWhileIdle: true },
+    },
+  ] })
+}
+
 export async function syncNativeNotifications(
   tasks: Task[],
   events: CalendarEvent[],
@@ -97,14 +143,7 @@ export async function syncNativeNotifications(
   await cancelPreviouslyScheduled()
   if ((await getNotificationAccess()) !== 'granted') return
 
-  await LocalNotifications.createChannel({
-    id: channelId,
-    name: 'StudentOS deadlines',
-    description: 'Deadlines and reminders from your StudentOS workspace.',
-    importance: 4,
-    visibility: 1,
-    vibration: true,
-  })
+  await ensureNotificationChannel()
 
   const notifications: LocalNotificationSchema[] = []
   if (preferences.taskReminders) {

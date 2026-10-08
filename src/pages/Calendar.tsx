@@ -41,6 +41,10 @@ function calendarItems(subjects: Subject[], tasks: Task[], events: CalendarEvent
 
 function entryTime(item: CalendarItem) { return item.allDay ? 'All day' : item.start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) }
 
+function isUpcoming(item: CalendarItem, now: Date) {
+  return item.end ? item.end > now : item.start >= now
+}
+
 export function Calendar() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -57,8 +61,10 @@ export function Calendar() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>()
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' } | null>(null)
+  const [now, setNow] = useState(() => new Date())
 
   useEffect(() => { if (!userId) return; const unsubs = [subscribeToSubjects(userId, setSubjects, () => undefined), subscribeToTasks(userId, setTasks, () => undefined), subscribeToEvents(userId, (nextEvents) => { setEvents(nextEvents); setLoading(false) }, (firestoreError) => { setError(getFirebaseErrorMessage(firestoreError, 'We could not load your calendar events.')); setLoading(false) })]; return () => unsubs.forEach((unsubscribe) => unsubscribe()) }, [userId])
+  useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 60_000); return () => window.clearInterval(timer) }, [])
 
   const monthStart = startOfMonth(currentDate)
   const gridStart = startOfWeek(monthStart)
@@ -68,7 +74,7 @@ export function Calendar() {
   const rangeStart = view === 'month' ? gridStart : view === 'week' ? weekStart : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
   const rangeEnd = view === 'month' ? endOfDay(gridEnd) : view === 'week' ? endOfDay(addDays(weekStart, 6)) : endOfDay(rangeStart)
   const items = calendarItems(subjects, tasks, events, rangeStart, rangeEnd)
-  const upcoming = calendarItems(subjects, tasks, events, new Date(), addDays(new Date(), 30)).slice(0, 8)
+  const upcoming = calendarItems(subjects, tasks, events, now, addDays(now, 30)).filter((item) => isUpcoming(item, now)).slice(0, 8)
   const days = view === 'month' ? Array.from({ length: 42 }, (_, index) => addDays(gridStart, index)) : view === 'week' ? Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)) : [currentDate]
 
   function itemsForDay(day: Date) { return items.filter((item) => dateKey(item.start) === dateKey(day)) }
